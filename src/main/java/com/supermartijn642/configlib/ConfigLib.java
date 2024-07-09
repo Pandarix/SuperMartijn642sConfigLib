@@ -1,14 +1,13 @@
 package com.supermartijn642.configlib;
 
-import io.netty.buffer.Unpooled;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import org.slf4j.Logger;
@@ -24,8 +23,6 @@ public class ConfigLib implements ModInitializer {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("configlib");
 
-    protected static final ResourceLocation CHANNEL_ID = new ResourceLocation("supermartijn642configlib", "sync_configs");
-
     private static final List<ModConfig<?>> CONFIGS = new ArrayList<>();
     private static final Set<String> CONFIG_NAMES = new HashSet<>();
     private static final List<ModConfig<?>> SYNCABLE_CONFIGS = new ArrayList<>();
@@ -34,6 +31,7 @@ public class ConfigLib implements ModInitializer {
     public ConfigLib(){
         ServerLifecycleEvents.SERVER_STARTING.register(server -> onLoadGame());
         ServerConfigurationConnectionEvents.CONFIGURE.register(ConfigLib::onPlayerJoinServer);
+        PayloadTypeRegistry.configurationS2C().register(ConfigSyncPacket.TYPE, ConfigSyncPacket.CODEC);
     }
 
     @Override
@@ -79,38 +77,31 @@ public class ConfigLib implements ModInitializer {
     }
 
     private static void sendSyncConfigPackets(ServerConfigurationPacketListenerImpl handler){
-        for(ModConfig<?> config : SYNCABLE_CONFIGS){
-            FriendlyByteBuf buffer = createSyncedEntriesPacket(config);
-            if(buffer != null)
-                ServerConfigurationNetworking.send(handler, CHANNEL_ID, buffer);
-        }
+        for(ModConfig<?> config : SYNCABLE_CONFIGS)
+            ServerConfigurationNetworking.send(handler, new ConfigSyncPacket(config));
     }
 
-    private static FriendlyByteBuf createSyncedEntriesPacket(ModConfig<?> config){
-        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+    protected static void writeSyncedEntriesPacket(FriendlyByteBuf buffer, ConfigSyncPacket packet){
+        ModConfig<?> config = packet.config;
         buffer.writeUtf(config.getIdentifier());
         try{
             config.writeSyncableEntries(buffer);
         }catch(Exception e){
-            LOGGER.error("Failed to write syncable config entries for config '" + config.getIdentifier() + "' from mod '" + config.getModid() + "'!", e);
-            buffer.release();
-            return null;
+            throw new RuntimeException("Failed to write syncable config entries for config '" + config.getIdentifier() + "' from mod '" + config.getModid() + "'!", e);
         }
-        return buffer;
     }
 
-    protected static void handleSyncConfigPacket(FriendlyByteBuf buffer){
+    protected static ConfigSyncPacket handleSyncConfigPacket(FriendlyByteBuf buffer){
         String identifier = buffer.readUtf();
         ModConfig<?> config = SYNCABLE_CONFIGS_BY_IDENTIFIER.get(identifier);
-        if(config == null){
-            LOGGER.error("Received config sync packet for unknown config '" + identifier + "'!");
-            return;
-        }
+        if(config == null)
+            throw new RuntimeException("Received config sync packet for unknown config '" + identifier + "'!");
 
         try{
             config.readSyncableValues(buffer);
         }catch(Exception e){
             LOGGER.error("Failed to read syncable config entries for config '" + config.getIdentifier() + "' from mod '" + config.getModid() + "'!", e);
         }
+        return new ConfigSyncPacket();
     }
 }

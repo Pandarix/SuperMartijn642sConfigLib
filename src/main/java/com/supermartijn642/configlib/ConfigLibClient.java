@@ -18,6 +18,6 @@ public class ConfigLibClient implements ClientModInitializer {
     protected static void registerEventListeners(){
         ClientConfigurationConnectionEvents.INIT.register((handler, client) -> ConfigLib.onLoadGame());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ConfigLib.onLeaveGame());
-        ClientConfigurationNetworking.registerGlobalReceiver(ConfigLib.CHANNEL_ID, (client, handler, buffer, responseSender) -> ConfigLib.handleSyncConfigPacket(buffer));
+        ClientConfigurationNetworking.registerGlobalReceiver(ConfigSyncPacket.TYPE, (packet, context) -> {});
     }
 }
