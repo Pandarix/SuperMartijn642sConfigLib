@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
  */
 public class ConfigSyncPacket implements CustomPacketPayload {
 
-    public static final ResourceLocation IDENTIFIER = new ResourceLocation("supermartijn642configlib", "sync_packet");
+    public static final ResourceLocation IDENTIFIER = ResourceLocation.fromNamespaceAndPath("supermartijn642configlib", "sync_packet");
     public static final CustomPacketPayload.Type<ConfigSyncPacket> TYPE = new Type<>(IDENTIFIER);
     public static final StreamCodec<FriendlyByteBuf,ConfigSyncPacket> CODEC = StreamCodec.of(ConfigLib::writeSyncedEntriesPacket, ConfigLib::handleSyncConfigPacket);
     public final ModConfig<?> config;
