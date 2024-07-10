@@ -1,6 +1,7 @@
 package com.supermartijn642.configlib;
 
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
@@ -10,6 +11,8 @@ import net.minecraft.resources.ResourceLocation;
 public class ConfigSyncPacket implements CustomPacketPayload {
 
     public static final ResourceLocation IDENTIFIER = new ResourceLocation("supermartijn642configlib", "sync_packet");
+    public static final CustomPacketPayload.Type<ConfigSyncPacket> TYPE = new Type<>(IDENTIFIER);
+    public static final StreamCodec<FriendlyByteBuf,ConfigSyncPacket> CODEC = StreamCodec.of(ConfigLib::writeSyncedEntriesPacket, ConfigLib::handleSyncConfigPacket);
     public final ModConfig<?> config;
 
     protected ConfigSyncPacket(ModConfig<?> config){
@@ -21,12 +24,7 @@ public class ConfigSyncPacket implements CustomPacketPayload {
     }
 
     @Override
-    public void write(FriendlyByteBuf buffer){
-        ConfigLib.writeSyncedEntriesPacket(this, buffer);
-    }
-
-    @Override
-    public ResourceLocation id(){
-        return IDENTIFIER;
+    public Type<? extends CustomPacketPayload> type(){
+        return TYPE;
     }
 }

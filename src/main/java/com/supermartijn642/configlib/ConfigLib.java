@@ -1,13 +1,10 @@
 package com.supermartijn642.configlib;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.fml.IExtensionPoint;
 import net.neoforged.fml.ModList;
-import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
@@ -15,7 +12,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlerEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,9 +34,6 @@ public class ConfigLib {
     private static final Map<String,ModConfig<?>> SYNCABLE_CONFIGS_BY_IDENTIFIER = new HashMap<>();
 
     public ConfigLib(IEventBus eventBus){
-        // Allow connection if there are no syncable configs or if the server has the same mod version
-        ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class, () -> new IExtensionPoint.DisplayTest(ConfigLib::getModVersion, (remoteVersion, isFromServer) -> canConnectWith(remoteVersion)));
-
         // Register event listeners
         NeoForge.EVENT_BUS.addListener((Consumer<ServerAboutToStartEvent>)e -> onLoadGame());
         NeoForge.EVENT_BUS.addListener((Consumer<PlayerEvent.PlayerLoggedInEvent>)e -> {
@@ -49,13 +43,13 @@ public class ConfigLib {
         if(isClientEnvironment())
             ConfigLibClient.registerEventListeners();
 
-        eventBus.addListener((Consumer<RegisterPayloadHandlerEvent>)e ->
+        eventBus.addListener((Consumer<RegisterPayloadHandlersEvent>)e ->
             e.registrar("supermartijn642configlib")
                 .versioned(getModVersion())
                 .optional()
-                .configuration(
-                    new ResourceLocation("supermartijn642configlib", "sync_packet"),
-                    ConfigLib::handleSyncConfigPacket,
+                .configurationToClient(
+                    ConfigSyncPacket.TYPE,
+                    ConfigSyncPacket.CODEC,
                     (p, c) -> {}
                 )
         );
@@ -71,10 +65,6 @@ public class ConfigLib {
 
     public static String getModVersion(){
         return ModList.get().getModContainerById("supermartijn642configlib").orElseThrow().getModInfo().getVersion().toString();
-    }
-
-    public static boolean canConnectWith(String remoteVersion){
-        return SYNCABLE_CONFIGS.isEmpty() || getModVersion().equals(remoteVersion);
     }
 
     public static File getConfigFolder(){
@@ -109,10 +99,10 @@ public class ConfigLib {
 
     private static void sendSyncConfigPackets(ServerPlayer sender){
         for(ModConfig<?> config : SYNCABLE_CONFIGS)
-            PacketDistributor.PLAYER.with(sender).send(new ConfigSyncPacket(config));
+            PacketDistributor.sendToPlayer(sender, new ConfigSyncPacket(config));
     }
 
-    protected static void writeSyncedEntriesPacket(ConfigSyncPacket packet, FriendlyByteBuf buffer){
+    protected static void writeSyncedEntriesPacket(FriendlyByteBuf buffer, ConfigSyncPacket packet){
         ModConfig<?> config = packet.config;
         buffer.writeUtf(config.getIdentifier());
         try{
@@ -125,10 +115,8 @@ public class ConfigLib {
     protected static ConfigSyncPacket handleSyncConfigPacket(FriendlyByteBuf buffer){
         String identifier = buffer.readUtf();
         ModConfig<?> config = SYNCABLE_CONFIGS_BY_IDENTIFIER.get(identifier);
-        if(config == null){
-            LOGGER.error("Received config sync packet for unknown config '" + identifier + "'!");
-            return null;
-        }
+        if(config == null)
+            throw new RuntimeException("Received config sync packet for unknown config '" + identifier + "'!");
 
         try{
             config.readSyncableValues(buffer);

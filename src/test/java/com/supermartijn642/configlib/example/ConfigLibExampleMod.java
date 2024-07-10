@@ -1,6 +1,7 @@
 package com.supermartijn642.configlib.example;
 
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
@@ -15,7 +16,7 @@ public class ConfigLibExampleMod {
         ExampleModConfig.booleanValue.get();
     }
 
-    @Mod.EventBusSubscriber
+    @EventBusSubscriber
     public static class Events {
 
         @SubscribeEvent
