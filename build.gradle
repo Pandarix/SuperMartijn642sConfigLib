@@ -1,7 +1,7 @@
 import java.util.regex.Pattern
 
 plugins {
-    id "fabric-loom" version "1.1-SNAPSHOT"
+    id "fabric-loom" version "1.6-SNAPSHOT"
     id "com.matthewprenger.cursegradle" version "1.4.0"
     id "com.modrinth.minotaur" version "2.+"
 }
@@ -14,6 +14,9 @@ sourceCompatibility = JavaLanguageVersion.of(project.java_target)
 targetCompatibility = JavaLanguageVersion.of(project.java_target)
 
 println("Java: " + System.getProperty("java.version") + " JVM: " + System.getProperty("java.vm.version") + "(" + System.getProperty("java.vendor") + ") Arch: " + System.getProperty("os.arch"))
+
+// Keep parameter names when compiling
+compileJava.options.compilerArgs.add '-parameters'
 
 repositories {
     flatDir {
