@@ -33,7 +33,7 @@ public class ConfigLib {
 
     public static final Logger LOGGER = LoggerFactory.getLogger("configlib");
 
-    protected static final ResourceLocation CHANNEL_ID = new ResourceLocation("supermartijn642configlib", "sync_configs");
+    protected static final ResourceLocation CHANNEL_ID = ResourceLocation.fromNamespaceAndPath("supermartijn642configlib", "sync_configs");
     private static SimpleChannel channel;
 
     private static final List<ModConfig<?>> CONFIGS = new ArrayList<>();
