@@ -1,7 +1,10 @@
 package com.supermartijn642.configlib;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.protocol.configuration.ServerConfigurationPacketListener;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.network.ConfigurationTask;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
@@ -9,9 +12,9 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.configuration.ICustomConfigurationTask;
+import net.neoforged.neoforge.network.event.RegisterConfigurationTasksEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +39,6 @@ public class ConfigLib {
     public ConfigLib(IEventBus eventBus){
         // Register event listeners
         NeoForge.EVENT_BUS.addListener((Consumer<ServerAboutToStartEvent>)e -> onLoadGame());
-        NeoForge.EVENT_BUS.addListener((Consumer<PlayerEvent.PlayerLoggedInEvent>)e -> {
-            if(e.getEntity() instanceof ServerPlayer)
-                onPlayerJoinServer((ServerPlayer)e.getEntity());
-        });
         if(isClientEnvironment())
             ConfigLibClient.registerEventListeners();
 
@@ -53,6 +52,24 @@ public class ConfigLib {
                     (p, c) -> {}
                 )
         );
+        ConfigurationTask.Type type = new ConfigurationTask.Type(new ResourceLocation("supermartijn642configlib", "sync_configs"));
+        eventBus.addListener((Consumer<RegisterConfigurationTasksEvent>)e -> {
+            ServerConfigurationPacketListener listener = e.getListener();
+            if(listener.hasChannel(ConfigSyncPacket.TYPE)){
+                e.register(new ICustomConfigurationTask() {
+                    @Override
+                    public void run(Consumer<CustomPacketPayload> sender){
+                        sendSyncConfigPackets(sender);
+                        listener.finishCurrentTask(type);
+                    }
+
+                    @Override
+                    public Type type(){
+                        return type;
+                    }
+                });
+            }
+        });
     }
 
     public static boolean isClientEnvironment(){
@@ -93,13 +110,9 @@ public class ConfigLib {
         CONFIGS.forEach(ModConfig::onLeaveGame);
     }
 
-    protected static void onPlayerJoinServer(ServerPlayer sender){
-        sendSyncConfigPackets(sender);
-    }
-
-    private static void sendSyncConfigPackets(ServerPlayer sender){
+    private static void sendSyncConfigPackets(Consumer<CustomPacketPayload> consumer){
         for(ModConfig<?> config : SYNCABLE_CONFIGS)
-            PacketDistributor.sendToPlayer(sender, new ConfigSyncPacket(config));
+            consumer.accept(new ConfigSyncPacket(config));
     }
 
     protected static void writeSyncedEntriesPacket(FriendlyByteBuf buffer, ConfigSyncPacket packet){
